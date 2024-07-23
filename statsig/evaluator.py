@@ -1,4 +1,6 @@
 import base64
+import bisect
+import functools
 import time
 from datetime import datetime
 import re
@@ -14,8 +16,7 @@ from .client_initialize_formatter import ClientInitializeResponseFormatter
 from .evaluation_details import EvaluationDetails, EvaluationReason
 from .spec_store import _SpecStore
 from .config_evaluation import _ConfigEvaluation
-from .utils import HashingAlgorithm
-
+from .utils import HashingAlgorithm, binary_search
 
 class _Evaluator:
     def __init__(self, spec_store: _SpecStore):
@@ -443,13 +444,11 @@ class _Evaluator:
         if op == "any":
             if user_bucket is not None:
                 return self.__lookup_user_bucket(value, user_bucket)
-            return self.__match_string_in_array(
-                value, target, lambda a, b: a.upper().lower() == b.upper().lower())
+            return self.__fast_match_string_in_array(value, condition)
         if op == "none":
             if user_bucket is not None:
                 return not self.__lookup_user_bucket(value, user_bucket)
-            return not self.__match_string_in_array(
-                value, target, lambda a, b: a.upper().lower() == b.upper().lower())
+            return not self.__fast_match_string_in_array(value, condition)
         if op == "any_case_sensitive":
             return self.__match_string_in_array(
                 value, target, lambda a, b: a == b)
@@ -558,6 +557,26 @@ class _Evaluator:
                 return custom_id
             return user.custom_ids.get(id_type.lower(), None)
         return user.user_id
+
+    def __fast_match_string_in_array(self, value, condition):
+        str_value = self.__get_value_as_string(value)
+        target = condition.get("targetValue")
+        if str_value is None or target is None:
+            return False
+
+        try:
+            fastTarget = condition.get("fastTargetValue")
+            if not fastTarget:
+                fastTarget = [ str(a).upper().lower() for a in target ]
+                fastTarget.sort()
+                condition["fastTargetValue"] = fastTarget
+
+            value = str_value.upper().lower()
+            ret = binary_search(fastTarget, value) != -1
+            return ret
+        except Exception as e:
+            print("EXC", e, condition.get("targetValue"))
+        return False
 
     def __match_string_in_array(self, value, target, compare):
         str_value = self.__get_value_as_string(value)

@@ -1,3 +1,4 @@
+import bisect
 from enum import Enum
 import json
 from typing import Optional
@@ -36,3 +37,23 @@ def djb2_hash_for_dict(object: dict):
 
 def get_sorted_dict(object: dict):
     return {k: get_sorted_dict(object[k]) if isinstance(object[k], dict) else object[k] for k in sorted(object.keys())}
+
+def binary_search(arr, x):
+    """Perform binary search on a sorted array using bisect module.
+
+    Args:
+    arr (list): A sorted list of elements to search within.
+    x: The element to search for in the list.
+
+    Returns:
+    int: The index of the element in the list if found. Otherwise, returns -1.
+    """
+    # Find the insertion point
+    index = bisect.bisect_left(arr, x)
+
+    # Check if the element at the insertion point is the target element
+    if index < len(arr) and arr[index] == x:
+        return index
+    else:
+        return -1
+
